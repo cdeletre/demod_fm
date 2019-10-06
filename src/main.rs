@@ -23,9 +23,9 @@
  */
 
 // import local modules
-extern crate demod;
-use demod::usage;
-use demod::usage::DataType::{I16, F32};
+extern crate demod_fm;
+use demod_fm::usage;
+use demod_fm::usage::DataType::{S8,U8,I16, F32};
 
 // import external modules
 use std::io;
@@ -57,7 +57,7 @@ macro_rules! println_stderr(
 fn main() {
     let args = usage::args();
 
-    println_stderr!("demod {} andres.vahter@gmail.com\n\n", env!("CARGO_PKG_VERSION"));
+    println_stderr!("demod_fm {} andres.vahter@gmail.com\n\n", env!("CARGO_PKG_VERSION"));
 
     // filter options
     let filter_len = 64;
@@ -79,6 +79,8 @@ fn main() {
     let resampler = msresamp::MsresampCrcf::new(resampler_rate, filter_attenuation);
 
     let num_samples = match args.inputtype.unwrap() {
+        S8 => {BUFFER_SIZE as u32 / 2},
+        U8 => {BUFFER_SIZE as u32 / 2},
         I16 => {BUFFER_SIZE as u32 / 4},
         F32 => {BUFFER_SIZE as u32 / 8},
     };
@@ -103,6 +105,26 @@ fn main() {
         let mut sample_count: usize = 0;
 
         match args.inputtype.unwrap() {
+            S8 => {
+                for b in invec.chunks(2) {
+                    let i: f32 = 2. * ((b[0] as i8) as f32 + 128.) / 255. - 1.;
+                    let q: f32 = 2. * ((b[1] as i8) as f32 + 128.) / 255. - 1.;
+
+                    input[sample_count] = Complex::<f32>::new(i, q);
+                    sample_count += 1;
+                }
+            }
+
+            U8 => {
+                for b in invec.chunks(2) {
+                    let i: f32 = 2. * ((b[0] as u8 ) as f32 / 255.) - 1.;
+                    let q: f32 = 2. * ((b[1] as u8 ) as f32 / 255.) - 1.;
+
+                    input[sample_count] = Complex::<f32>::new(i, q);
+                    sample_count += 1;
+                }
+            }
+
             I16 => {
                 for b in invec.chunks(4) {
                     let i: f32 = ((b[1] as i16) << 8 | b[0] as i16) as f32 / 32768.;
@@ -134,6 +156,66 @@ fn main() {
         let mut demod_f32_out = fm_demod.demodulate_block(&resampler_output);
 
         match args.outputtype.unwrap() {
+            S8 => {
+                let mut demod_s8_out = vec![0_i8; resampler_output_len];
+                for i in 0 .. resampler_output_len {
+                    if args.fmargs.squarewave.unwrap() {
+                        // make output square like, multimon-ng likes it more
+                        if demod_f32_out[i] > 0.0 {
+                            demod_f32_out[i] = 1.0;
+                        }
+                        if demod_f32_out[i] < 0.0 {
+                            demod_f32_out[i] = -1.0;
+                        }
+                    }
+                    else {
+                        // clamp output
+                        if demod_f32_out[i] > 1.0 {
+                            demod_f32_out[i] = 1.0;
+                        }
+                        if demod_f32_out[i] < -1.0 {
+                            demod_f32_out[i] = -1.0;
+                        }
+                    }
+
+                    demod_s8_out[i] = (255. * ((demod_f32_out[i] + 1.) / 2.) - 128. ) as i8;
+                }
+
+                let slice = unsafe {slice::from_raw_parts(demod_s8_out.as_ptr() as *const _, resampler_output_len as usize)};
+                stdout.write(&slice).map_err(|e|{println_stderr!("demod stdout.write error: {}", e);}).unwrap();
+                stdout.flush().map_err(|e|{println_stderr!("demod stdout.flush error: {}", e);}).unwrap();
+            }
+
+            U8 => {
+                let mut demod_u8_out = vec![0_u8; resampler_output_len];
+                for i in 0 .. resampler_output_len {
+                    if args.fmargs.squarewave.unwrap() {
+                        // make output square like, multimon-ng likes it more
+                        if demod_f32_out[i] > 0.0 {
+                            demod_f32_out[i] = 1.0;
+                        }
+                        if demod_f32_out[i] < 0.0 {
+                            demod_f32_out[i] = -1.0;
+                        }
+                    }
+                    else {
+                        // clamp output
+                        if demod_f32_out[i] > 1.0 {
+                            demod_f32_out[i] = 1.0;
+                        }
+                        if demod_f32_out[i] < -1.0 {
+                            demod_f32_out[i] = -1.0;
+                        }
+                    }
+
+                    demod_u8_out[i] = 255 * ((demod_f32_out[i] + 1.) / 2.) as u8;
+                }
+
+                let slice = unsafe {slice::from_raw_parts(demod_u8_out.as_ptr() as *const _, resampler_output_len as usize)};
+                stdout.write(&slice).map_err(|e|{println_stderr!("demod stdout.write error: {}", e);}).unwrap();
+                stdout.flush().map_err(|e|{println_stderr!("demod stdout.flush error: {}", e);}).unwrap();
+            }
+
             I16 => {
                 let mut demod_i16_out = vec![0_i16; resampler_output_len];
                 for i in 0 .. resampler_output_len {

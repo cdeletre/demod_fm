@@ -23,7 +23,7 @@
  */
 
 use clap::{App, Arg, SubCommand};
-use self::DataType::{F32, I16};
+use self::DataType::{F32, I16,U8,S8};
 use self::Modulation::{FM};
 
 use std::fmt;
@@ -34,6 +34,8 @@ use std::process::exit;
 pub enum DataType {
     F32,
     I16,
+    U8,
+    S8,
 }
 
 impl fmt::Display for DataType {
@@ -41,6 +43,8 @@ impl fmt::Display for DataType {
         match *self {
             DataType::F32 => {write!(f, "f32")},
             DataType::I16 => {write!(f, "i16")},
+            DataType::U8 => {write!(f, "u8")},
+            DataType::S8 => {write!(f, "s8")},
         }
     }
 }
@@ -67,7 +71,7 @@ pub struct CommandArgs {
 }
 
 pub fn args() -> CommandArgs {
-    let datatypes = ["i16", "f32"];
+    let datatypes = ["s8","u8","i16", "f32"];
 
     let matches = App::new("demod")
                 .author("Andres Vahter <andres.vahter@gmail.com>")
@@ -153,12 +157,16 @@ pub fn args() -> CommandArgs {
             match matches.value_of("INTYPE").unwrap() {
                 "f32" => {args.inputtype = Some(F32);},
                 "i16" => {args.inputtype = Some(I16);},
+                "u8" => {args.inputtype = Some(U8);},
+                "s8" => {args.inputtype = Some(S8);},
                 _ => unreachable!()
             }
 
             match matches.value_of("OUTTYPE").unwrap() {
                 "f32" => {args.outputtype = Some(F32);},
                 "i16" => {args.outputtype = Some(I16);},
+                "u8" => {args.outputtype = Some(U8);},
+                "s8" => {args.outputtype = Some(S8);},
                 _ => unreachable!()
             }
 

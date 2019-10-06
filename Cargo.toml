@@ -1,5 +1,5 @@
 [package]
-name = "demod"
+name = "demod_fm"
 version = "0.9.8"
 authors = ["Andres Vahter <andres.vahter@gmail.com>"]
 
